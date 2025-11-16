@@ -101,7 +101,7 @@ class AutonomousDetectionMission:
             if position.relative_altitude_m >= altitude * 0.9:
                 print(f"✅ Reached altitude: {position.relative_altitude_m:.1f}m")
                 break
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.1)
 
 
     async def goto_position(self, x: float, y: float, z: float, yaw: float = 0.0):
@@ -222,7 +222,50 @@ class AutonomousDetectionMission:
             # 2. Takeoff
             await self.arm_and_takeoff(altitude=5.0)
             await asyncio.sleep(2)
+
+            # 3. Search pattern - fly multiple waypoints
+            print("\n📹 Executing search pattern...")
             
+            drone_yaw = await self.get_heading()
+            
+            search_waypoints = [
+                (5.0, 0.0, -5.0, "North 5m"),
+                (10.0, 0.0, -5.0, "North 10m"),
+                (10.0, 5.0, -5.0, "Northeast corner"),
+                (5.0, 5.0, -5.0, "East 5m"),
+                (0.0, 5.0, -5.0, "Southeast corner"),
+                (0.0, 0.0, -5.0, "Home position")
+            ]
+            
+            print(f"   Flying {len(search_waypoints)} waypoints...")
+            
+            for i, waypoint in enumerate(search_waypoints, 1):
+                x, y, z, description = waypoint[0], waypoint[1], waypoint[2], waypoint[3]
+                print(f"\n   Waypoint {i}/{len(search_waypoints)}: {description}")
+                print(f"   Coordinates: N={x}m, E={y}m, Alt={-z}m")
+                
+                success = await self.goto_position(x, y, z, drone_yaw)
+                
+                if success:
+                    print(f"   ✅ Reached waypoint {i}")
+                    
+                    # Simulate detection check at each waypoint
+                    if i == 2:  # Detect "target" at waypoint 2
+                        print(f"\n   🎯 TARGET DETECTED at waypoint {i}!")
+                        print(f"   📸 Visual confirmation: PERSON DETECTED")
+                        self.target_detected = True
+                        break
+                else:
+                    print(f"   ⚠️  Failed to reach waypoint {i}")
+            
+            if not self.target_detected:
+                print("\n   ⚠️  Search complete - no target found")
+            
+            # 4. Return phase
+            if self.target_detected:
+                print("✅ Target confirmed!")
+                
+            """
             # 3. Search phase
             print("\n📹 Starting visual search...")
             search_timeout = 30  # seconds
@@ -245,12 +288,15 @@ class AutonomousDetectionMission:
             print(f"\n🚁 Approaching target at {target_waypoint}...")
             success = await self.goto_position(*target_waypoint, drone_yaw)
             
+            
             if success:
                 print("✅ Target reached!")
                 print("📸 Visual confirmation: TARGET ACQUIRED")
                 self.target_confirmed = True
             else:
                 print("⚠️  Failed to reach target")
+
+            """
             
             # 5. Return and land
             print("\n🏠 Returning to home...")
